@@ -24,6 +24,7 @@ from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Route
 
 from .config import Settings
+from .paths import web_dir
 from .service import AuthError, FaceAuthService, build_default
 
 MAX_FRAMES = 8
@@ -90,7 +91,7 @@ def create_app(service: FaceAuthService | None = None, cfg: Settings | None = No
     async def health(req: Request):
         return JSONResponse({"ok": True})
 
-    static = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web")
+    static = str(web_dir())
 
     async def widget(req: Request):
         return FileResponse(os.path.join(static, "faceauth.js"), media_type="application/javascript")

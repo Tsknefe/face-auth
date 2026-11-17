@@ -27,21 +27,40 @@ Projelerine takılabilen **yüz doğrulama ve canlılık testi** eklentisi. Krit
 - **Token'lar:** RS256 imzalı JWT kullanılır. Token proje (`aud`), kullanıcı (`sub`) ve işlem (`scope`) ile sınırlıdır, 5 dakika geçerlidir ve tek kullanımlıktır (`jti`). Projelerin face-auth ile gizli bir anahtar paylaşması gerekmez; doğrulama public key ile yapılır.
 - **Kötüye kullanım koruması:** Challenge tek kullanımlıktır ve 60 saniyede düşer. Art arda 5 başarısız denemeden sonra kullanıcı 15 dakika kilitlenir.
 
-## Kurulum ve çalıştırma
+## Çalıştırma
+
+### En kolayı: Windows exe
+
+[Releases](../../releases) sayfasından ya da [Actions](../../actions) sekmesinde son başarılı "build" çalışmasının "Artifacts" kısmından `face-auth.exe`'yi indir ve çift tıkla. Kurulum gerekmez, yüz modelleri exe'nin içinde geliyor. Tarayıcıda demo sayfası kendiliğinden açılır. Önce "Yüzümü kaydet"e, sonra "Doğrula"ya bas.
+
+Veriler (şifreli yüz şablonları, imza anahtarı ve denetim kaydı) `%APPDATA%\face-auth` klasöründe tutulur. Böylece exe'yi güncellediğinde kayıtlar kaybolmaz.
+
+> Windows SmartScreen "tanınmayan uygulama" uyarısı verebilir, çünkü exe imzalı değil. "Ek bilgi → Yine de çalıştır" ile açabilirsin.
+
+### Kaynaktan (geliştirme için)
 
 ```bash
 pip install -r requirements.txt
-# geliştirme modu (API anahtarı yok, herkes "dev" projesi sayılır):
-uvicorn faceauth.api:app --port 8100
-# tarayıcıda: http://localhost:8100/demo  → önce "Yüzümü kaydet", sonra "Doğrula"
+python -m faceauth               # http://localhost:8100/demo açılır
 ```
+
+### Sunucuda: Docker
+
+```bash
+echo FACEAUTH_API_KEYS=crypto:$(python -c "import secrets;print(secrets.token_urlsafe(32))") > .env
+docker compose up -d --build
+```
+
+### Yeni bir sürüm çıkarmak
+
+GitHub'da **Releases → Draft a new release** yolunu izle, bir etiket ver (örneğin `v0.1.0`) ve **Publish**'e bas. GitHub Actions exe'yi Windows'ta derler, gerçek modellerle test eder ve release'e ekler. `main`'e yapılan her push'ta da testler çalışır; exe ve Docker imajı otomatik olarak derlenir.
 
 Gerçek kullanımda her projeye ayrı bir API anahtarı ver:
 
 ```bash
 set FACEAUTH_API_KEYS=crypto:uzun-rastgele-anahtar-1,blog:uzun-rastgele-anahtar-2
 set FACEAUTH_CORS_ORIGINS=https://kripto.example.com,https://blog.example.com
-uvicorn faceauth.api:app --host 0.0.0.0 --port 8100
+python -m faceauth --host 0.0.0.0 --port 8100
 ```
 
 (Linux/macOS'te `set` yerine `export` kullan. Üretim ortamında servisi mutlaka HTTPS arkasında çalıştır.)

@@ -1,0 +1,15 @@
+services:
+  face-auth:
+    build: .
+    ports:
+      - "8100:8100"
+    environment:
+      # one key per project: "name:key,name2:key2"  (generate with: python -c "import secrets;print(secrets.token_urlsafe(32))")
+      FACEAUTH_API_KEYS: "${FACEAUTH_API_KEYS:?set FACEAUTH_API_KEYS in .env}"
+      FACEAUTH_CORS_ORIGINS: "${FACEAUTH_CORS_ORIGINS:-http://localhost:3000}"
+    volumes:
+      - faceauth-data:/data      # encrypted templates, signing key, audit log
+    restart: unless-stopped
+
+volumes:
+  faceauth-data:

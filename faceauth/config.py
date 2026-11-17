@@ -5,6 +5,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .paths import default_data_dir, default_model_dir
+
 
 def _env(name: str, default: str) -> str:
     return os.environ.get(f"FACEAUTH_{name}", default)
@@ -12,8 +14,8 @@ def _env(name: str, default: str) -> str:
 
 @dataclass
 class Settings:
-    data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", "./data")))
-    model_dir: Path = field(default_factory=lambda: Path(_env("MODEL_DIR", "./models")))
+    data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", str(default_data_dir()))))
+    model_dir: Path = field(default_factory=lambda: Path(_env("MODEL_DIR", str(default_model_dir()))))
 
     # Issuer name written into tokens; projects check it.
     issuer: str = field(default_factory=lambda: _env("ISSUER", "face-auth"))

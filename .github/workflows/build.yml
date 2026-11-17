@@ -1,0 +1,81 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write   # needed to attach the .exe to a release
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+
+  windows-exe:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Download models (bundled into the exe)
+        run: python scripts/download_models.py models
+      - name: Build exe
+        run: pyinstaller --noconfirm packaging/face-auth.spec
+      - name: Smoke test (start exe, real models, check endpoints)
+        shell: pwsh
+        run: |
+          $env:FACEAUTH_DATA_DIR = "$env:RUNNER_TEMP\fa-data"
+          $p = Start-Process -FilePath dist\face-auth.exe -ArgumentList "--no-browser","--port","8123" -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Seconds 2
+            try { if ((Invoke-RestMethod http://127.0.0.1:8123/health).ok) { $ok = $true; break } } catch {}
+          }
+          if (-not $ok) { Stop-Process $p -Force; throw "exe did not start" }
+          Invoke-WebRequest http://127.0.0.1:8123/demo -UseBasicParsing | Out-Null
+          $jwks = Invoke-RestMethod http://127.0.0.1:8123/.well-known/jwks.json
+          if ($jwks.keys.Count -lt 1) { throw "no signing key" }
+          $c = Invoke-RestMethod -Method Post http://127.0.0.1:8123/v1/challenges -ContentType "application/json" -Body '{"user_id":"ci","purpose":"enroll"}'
+          if ($c.actions[0] -ne "center") { throw "bad challenge" }
+          Stop-Process $p -Force
+          Write-Host "exe OK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: face-auth-windows
+          path: dist/face-auth.exe
+      - name: Attach to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ github.event.release.tag_name }} dist/face-auth.exe --clobber
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t face-auth:ci .
+      - name: Smoke test
+        run: |
+          docker run -d --name fa -p 8100:8100 face-auth:ci
+          for i in $(seq 1 30); do curl -sf localhost:8100/health && break; sleep 2; done
+          curl -sf localhost:8100/.well-known/jwks.json | grep -q '"kty"'
+          docker logs fa
