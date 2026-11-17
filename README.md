@@ -39,6 +39,10 @@ Veriler (şifreli yüz şablonları, imza anahtarı ve denetim kaydı) `%APPDATA
 
 ### Kaynaktan (geliştirme için)
 
+Windows'ta **`baslat.bat`**'a çift tıkla. Dosya önce son güncellemeyi çeker (`git pull`), ilk çalıştırmada sanal ortamı kurar, gerekli paketleri kontrol eder ve servisi başlatır. Demo sayfası tarayıcıda kendiliğinden açılır.
+
+Elle çalıştırmak istersen:
+
 ```bash
 pip install -r requirements.txt
 python -m faceauth               # http://localhost:8100/demo açılır
