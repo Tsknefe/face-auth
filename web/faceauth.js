@@ -39,7 +39,7 @@
     return e;
   }
 
-  async function run({ serviceUrl, challenge, holdMs = 2200, settleMs = 900 }) {
+  async function run({ serviceUrl, challenge, holdMs = 2400, settleMs = 700, perStep = 4 }) {
     if (!document.getElementById("fa-css")) {
       const s = el("style"); s.id = "fa-css"; s.textContent = CSS; document.head.appendChild(s);
     }
@@ -74,15 +74,23 @@
         step.textContent = challenge.instructions[i];
         sub.textContent = `Adım ${i + 1}/${n}`;
         await sleep(settleMs);
+        // several frames per step: the server keeps the one with the clearest movement
+        const shots = [];
         const t0 = performance.now();
+        let next = 0;
         while (performance.now() - t0 < holdMs) {
           if (cancelled) throw new Error("cancelled");
-          bar.style.width = `${((i + (performance.now() - t0) / holdMs) / n) * 100}%`;
-          await sleep(50);
+          const t = (performance.now() - t0) / holdMs;
+          bar.style.width = `${((i + t) / n) * 100}%`;
+          if (shots.length < perStep && t >= 0.25 + (0.75 * next) / perStep) {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+            shots.push(canvas.toDataURL("image/jpeg", 0.85));
+            next++;
+          }
+          await sleep(40);
         }
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-        canvas.getContext("2d").drawImage(video, 0, 0);
-        frames.push(canvas.toDataURL("image/jpeg", 0.9));
+        frames.push(shots);
       }
       bar.style.width = "100%";
       step.textContent = "Kontrol ediliyor…"; sub.textContent = "";

@@ -59,13 +59,15 @@ class FaceAuthService:
         return ch
 
     # ------------------------------------------------------------------ complete
-    def complete(self, challenge_id: str, frames: list[bytes]) -> dict:
+    def complete(self, challenge_id: str, frames: list) -> dict:
         """Called by the browser. The challenge id is an unguessable one-time capability
         created by the project's backend, so no API key is needed (or exposed) here."""
         ch = self._take(challenge_id)
         project = ch.project
+        # frames: one entry per step; an entry is one image or a list of images
+        groups = [f if isinstance(f, (list, tuple)) else [f] for f in frames]
         try:
-            obs = [self.engine.analyze(f) for f in frames]
+            obs = [[self.engine.analyze(f) for f in g] for g in groups]
         except ValueError as e:
             raise AuthError("bad_image", str(e))
         live = check(ch, obs, self.cfg)

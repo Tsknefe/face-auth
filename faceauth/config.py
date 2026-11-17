@@ -29,8 +29,8 @@ class Settings:
     # Liveness challenge
     challenge_ttl_s: int = field(default_factory=lambda: int(_env("CHALLENGE_TTL", "60")))
     challenge_actions: int = field(default_factory=lambda: int(_env("CHALLENGE_ACTIONS", "2")))
-    yaw_delta: float = field(default_factory=lambda: float(_env("YAW_DELTA", "0.18")))
-    pitch_delta: float = field(default_factory=lambda: float(_env("PITCH_DELTA", "0.12")))
+    yaw_delta: float = field(default_factory=lambda: float(_env("YAW_DELTA", "0.15")))
+    pitch_delta: float = field(default_factory=lambda: float(_env("PITCH_DELTA", "0.18")))
     min_face_px: int = field(default_factory=lambda: int(_env("MIN_FACE_PX", "90")))
 
     # Optional passive anti-spoofing ONNX model (e.g. MiniFASNet). Empty = disabled.

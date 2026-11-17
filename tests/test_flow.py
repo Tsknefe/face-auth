@@ -222,3 +222,40 @@ def test_python_client_verify_token(svc, monkeypatch):
     other._jwks = fa._jwks
     with pytest.raises(FaceAuthError, match="invalid"):
         other.verify_token(tok, user_id="u1")
+
+
+def test_best_frame_of_each_step_is_used(svc):
+    """User reaches the pose only briefly: one good frame among several is enough."""
+    enroll(svc)
+    ch = svc.start("crypto", "u1", "verify")
+    steps = []
+    for a in ch["actions"]:
+        good = frames_for([a])[0]
+        lazy = frames_for(["center"])[0]
+        steps.append([lazy, good, lazy] if a != "center" else [good, good])
+    assert svc.complete(ch["challenge_id"], steps)["verified"]
+
+
+def test_failure_reports_measured_movement(svc):
+    enroll(svc)
+    ch = svc.start("crypto", "u1", "verify")
+    weak = []
+    for a in ch["actions"]:
+        y, p = POSE[a]
+        weak.append(json.dumps({"person": "alice", "yaw": y * 0.2, "pitch": p * 0.1}).encode())
+    with pytest.raises(AuthError) as e:
+        svc.complete(ch["challenge_id"], weak)
+    assert "measured" in e.value.message and "need" in e.value.message
+
+
+def test_http_accepts_multiple_frames_per_step(svc):
+    from starlette.testclient import TestClient
+    from faceauth.api import create_app
+    c = TestClient(create_app(service=svc))
+    H = {"X-API-Key": "K1"}
+    ch = c.post("/v1/challenges", json={"user_id": "u9", "purpose": "enroll"}, headers=H).json()
+    steps = [[base64.b64encode(f).decode()] * 3 for f in frames_for(ch["actions"])]
+    assert c.post(f"/v1/challenges/{ch['challenge_id']}/complete", json={"frames": steps}).json()["enrolled"]
+    ch = c.post("/v1/challenges", json={"user_id": "u9", "purpose": "enroll"}, headers=H).json()
+    too_many = [[base64.b64encode(f).decode()] * 7 for f in frames_for(ch["actions"])]
+    assert c.post(f"/v1/challenges/{ch['challenge_id']}/complete", json={"frames": too_many}).status_code == 400

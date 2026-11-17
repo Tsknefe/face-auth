@@ -27,7 +27,9 @@ from .config import Settings
 from .paths import web_dir
 from .service import AuthError, FaceAuthService, build_default
 
-MAX_FRAMES = 8
+MAX_STEPS = 8
+MAX_FRAMES_PER_STEP = 6
+MAX_FRAMES_TOTAL = 30
 MAX_FRAME_BYTES = 2_000_000
 
 
@@ -64,10 +66,10 @@ def create_app(service: FaceAuthService | None = None, cfg: Settings | None = No
     async def complete(req: Request):
         d = await body(req)
         raw = d.get("frames")
-        if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_FRAMES:
-            raise AuthError("bad_frames", f"'frames' must be a list of 1..{MAX_FRAMES} images")
-        frames = []
-        for f in raw:
+        if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_STEPS:
+            raise AuthError("bad_frames", f"'frames' must be a list of 1..{MAX_STEPS} steps")
+
+        def decode(f):
             if not isinstance(f, str):
                 raise AuthError("bad_frames", "frames must be base64 strings")
             if f.startswith("data:"):
@@ -78,7 +80,17 @@ def create_app(service: FaceAuthService | None = None, cfg: Settings | None = No
                 raise AuthError("bad_frames", "invalid base64")
             if len(b) > MAX_FRAME_BYTES:
                 raise AuthError("bad_frames", "frame too large")
-            frames.append(b)
+            return b
+
+        frames, total = [], 0
+        for step in raw:                       # a step = one image or a list of images
+            group = step if isinstance(step, list) else [step]
+            if not 1 <= len(group) <= MAX_FRAMES_PER_STEP:
+                raise AuthError("bad_frames", f"1..{MAX_FRAMES_PER_STEP} images per step")
+            total += len(group)
+            frames.append([decode(f) for f in group])
+        if total > MAX_FRAMES_TOTAL:
+            raise AuthError("bad_frames", "too many frames")
         return JSONResponse(svc.complete(req.path_params["cid"], frames))
 
     async def delete_user(req: Request):
